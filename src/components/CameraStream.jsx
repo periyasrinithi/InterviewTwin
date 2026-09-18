@@ -93,27 +93,79 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     };
   }, [onProctorWarning]);
 
-  // 2. AI Proctoring Loop (Gaze, Multiple Faces, Electronic Devices & Earphones)
+  // 2. Real-Time AI Computer Vision Frame Analyzer (HTML5 Canvas Pixel Analysis)
   useEffect(() => {
     startCamera();
 
-    const interval = setInterval(() => {
-      if (!cameraActive) return;
+    const frameAnalysisInterval = setInterval(() => {
+      if (!cameraActive || isVirtualMode) return;
 
+      const videoEl = videoRef.current;
+      if (!videoEl || videoEl.readyState !== 4) return;
+
+      try {
+        const canvas = analysisCanvasRef.current;
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(videoEl, 0, 0, 160, 120);
+
+        const imgData = ctx.getImageData(0, 0, 160, 120);
+        const data = imgData.data;
+
+        let darkPixelsInCenter = 0;
+        let totalSampled = 0;
+
+        // Sample pixels in lower-center area where candidates hold phones/devices (x: 35..125, y: 30..115)
+        for (let y = 30; y < 115; y += 2) {
+          for (let x = 35; x < 125; x += 2) {
+            const idx = (y * 160 + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            totalSampled++;
+
+            // Dark object detection (black phone body, dark casing, dark phone screen)
+            if (r < 75 && g < 75 && b < 75) {
+              darkPixelsInCenter++;
+            }
+          }
+        }
+
+        const darkRatio = darkPixelsInCenter / totalSampled;
+
+        // If a dark object covers > 14% of the candidate frame (e.g., phone held up to camera)
+        if (darkRatio > 0.14) {
+          if (!phoneDetectionDebounceRef.current) {
+            phoneDetectionDebounceRef.current = true;
+            setDeviceWarning('phone');
+            soundEffectsInstance.playSubmitTone();
+            onProctorWarning('🚨 REAL-TIME VISION: Smartphone / Electronic Device Detected in Camera!');
+            setTimeout(() => {
+              setDeviceWarning(null);
+              phoneDetectionDebounceRef.current = false;
+            }, 4500);
+          }
+        }
+      } catch (e) {
+        console.warn('Frame analysis error:', e);
+      }
+    }, 500); // Scans video frame every 500ms in real time!
+
+    // Periodic randomized simulation for Earphones & Extra Person
+    const simulationInterval = setInterval(() => {
+      if (!cameraActive) return;
       const randomVal = Math.random();
 
-      // 1. Occasional Eye Gaze Deviation Simulation (12% chance)
-      if (randomVal < 0.12) {
+      if (randomVal < 0.08) {
         setGazeWarning(true);
         setEyeContactScore(Math.floor(45 + Math.random() * 20));
         onProctorWarning('Eye Gaze Off-Screen / Looking Away');
         setTimeout(() => setGazeWarning(false), 2500);
       } else {
-        setGazeWarning(false);
-        setEyeContactScore(Math.floor(90 + Math.random() * 8));
+        setEyeContactScore(Math.floor(92 + Math.random() * 6));
       }
 
-      // 2. Extra Person Detection Simulation (6% chance)
       if (randomVal > 0.94) {
         setExtraPersonDetected(true);
         setDetectedFacesCount(2);
@@ -124,29 +176,20 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         }, 3000);
       }
 
-      // 3. Smartphone / Device Detection Simulation (5% chance)
-      if (randomVal > 0.88 && randomVal <= 0.94) {
-        setDeviceWarning('phone');
-        soundEffectsInstance.playSubmitTone();
-        onProctorWarning('Smartphone / Electronic Device Detected');
-        setTimeout(() => setDeviceWarning(null), 3500);
-      }
-
-      // 4. Earphones / AirPods Detection Simulation (5% chance)
-      if (randomVal > 0.83 && randomVal <= 0.88) {
+      if (randomVal > 0.88 && randomVal <= 0.94 && !deviceWarning) {
         setDeviceWarning('earphones');
         soundEffectsInstance.playSubmitTone();
         onProctorWarning('Earphones / AirPods Detected');
         setTimeout(() => setDeviceWarning(null), 3500);
       }
-
-    }, 4500);
+    }, 5000);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(frameAnalysisInterval);
+      clearInterval(simulationInterval);
       stopCurrentStream();
     };
-  }, []);
+  }, [cameraActive, isVirtualMode, onProctorWarning]);
 
   const handleToggleCamera = () => {
     if (cameraActive) {
