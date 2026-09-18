@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, Eye, AlertTriangle, Users, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Camera, CameraOff, Eye, AlertTriangle, Users, ShieldAlert, CheckCircle2, RefreshCw, Video } from 'lucide-react';
 import { soundEffectsInstance } from '../services/soundEffects';
 
 export default function CameraStream({ isLive = false, onProctorWarning = () => {} }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [isVirtualMode, setIsVirtualMode] = useState(false);
   const [cameraError, setCameraError] = useState(null);
 
   // Proctoring States
@@ -13,8 +13,6 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
   const [gazeWarning, setGazeWarning] = useState(false);
   const [extraPersonDetected, setExtraPersonDetected] = useState(false);
   const [detectedFacesCount, setDetectedFacesCount] = useState(1);
-  const [totalWarnings, setTotalWarnings] = useState(0);
-
   const streamRef = useRef(null);
 
   const stopCurrentStream = () => {
@@ -31,33 +29,53 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     try {
       setCameraError(null);
       stopCurrentStream();
+      
+      // Use standard video: true for maximum device compatibility
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        video: true,
         audio: false
       });
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(e => console.warn('Video play error:', e));
       }
       setCameraActive(true);
+      setIsVirtualMode(false);
     } catch (err) {
       console.warn('Camera access error:', err);
-      setCameraError('Camera access unavailable or blocked. Please allow webcam permissions in browser address bar.');
+      let msg = 'Camera access unavailable or blocked.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = 'Camera permission blocked by browser.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'No webcam hardware detected on this device.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = 'Camera is currently in use by another app (Zoom/Teams/Discord).';
+      }
+      setCameraError(msg);
       setCameraActive(false);
     }
+  };
+
+  // Toggle or start Virtual Simulation Candidate Feed
+  const handleEnableVirtualFeed = () => {
+    stopCurrentStream();
+    setCameraActive(true);
+    setIsVirtualMode(true);
+    setCameraError(null);
   };
 
   useEffect(() => {
     startCamera();
 
-    // AI Gaze & Multiple Person Detection Simulation Loop
+    // AI Gaze & Multiple Person Detection Loop
     const interval = setInterval(() => {
-      if (!streamRef.current) return;
+      if (!cameraActive) return;
 
       const randomVal = Math.random();
 
-      // 1. Occasional Eye Gaze Deviation Simulation (15% chance during practice)
+      // 1. Occasional Eye Gaze Deviation Simulation (15% chance)
       if (randomVal < 0.15) {
         setGazeWarning(true);
         setEyeContactScore(Math.floor(45 + Math.random() * 20));
@@ -90,6 +108,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     if (cameraActive) {
       stopCurrentStream();
       setCameraActive(false);
+      setIsVirtualMode(false);
     } else {
       startCamera();
     }
@@ -149,6 +168,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         transition: 'all 0.3s ease'
       }}>
 
+        {/* Real Live Hardware Webcam Video Element */}
         <video
           ref={videoRef}
           autoPlay
@@ -159,14 +179,66 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             height: '100%',
             objectFit: 'cover',
             transform: 'scaleX(-1)', // Mirror view
-            display: cameraActive ? 'block' : 'none'
+            display: (cameraActive && !isVirtualMode) ? 'block' : 'none'
           }}
         />
 
+        {/* Virtual Candidate AI Animated Stream Feed */}
+        {cameraActive && isVirtualMode && (
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            background: 'radial-gradient(circle at 50% 40%, #1e293b 0%, #0f172a 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white'
+          }}>
+            {/* Animated Face Outline Simulation */}
+            <svg width="120" height="120" viewBox="0 0 100 100">
+              <ellipse cx="50" cy="45" rx="25" ry="30" fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="4 2" className="animate-spin" style={{ animationDuration: '15s' }} />
+              <circle cx="42" cy="40" r="3" fill="#67e8f9" />
+              <circle cx="58" cy="40" r="3" fill="#67e8f9" />
+              <path d="M 42 55 Q 50 62 58 55" stroke="#6366f1" strokeWidth="2" fill="none" />
+              <path d="M 25 90 C 25 70, 75 70, 75 90" fill="none" stroke="#475569" strokeWidth="2" />
+            </svg>
+            <span style={{ fontSize: '0.75rem', color: '#a5b4fc', marginTop: '0.2rem', fontWeight: 600 }}>Virtual Candidate Feed (Active)</span>
+          </div>
+        )}
+
+        {/* Inactive or Permission Blocked Error Banner */}
         {!cameraActive && (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem' }}>
-            <CameraOff size={32} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-            <div style={{ fontSize: '0.85rem' }}>{cameraError || 'Webcam Stream Inactive'}</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', maxWidth: '340px' }}>
+            <CameraOff size={32} style={{ marginBottom: '0.5rem', color: '#f43f5e', opacity: 0.8 }} />
+            <div style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600, marginBottom: '0.4rem' }}>
+              {cameraError || 'Webcam Stream Inactive'}
+            </div>
+            
+            <p style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+              Click <strong>Allow</strong> in your browser address bar (left of localhost:8080) or switch to Virtual Candidate Feed below.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              <button
+                className="btn btn-primary"
+                onClick={startCamera}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+              >
+                <RefreshCw size={13} />
+                <span>Retry Webcam</span>
+              </button>
+
+              <button
+                className="btn btn-secondary"
+                onClick={handleEnableVirtualFeed}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderColor: '#6366f1', color: '#a5b4fc' }}
+              >
+                <Video size={13} />
+                <span>Enable Virtual Feed</span>
+              </button>
+            </div>
           </div>
         )}
 
