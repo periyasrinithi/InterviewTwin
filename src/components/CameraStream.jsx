@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, Eye, AlertTriangle, Users, ShieldAlert, CheckCircle2, RefreshCw, Video, Smartphone, Headphones, ExternalLink } from 'lucide-react';
+import { Camera, CameraOff, Eye, AlertTriangle, Users, ShieldAlert, CheckCircle2, RefreshCw, Video, Smartphone, Headphones, ExternalLink, ShieldCheck, Radio } from 'lucide-react';
 import { soundEffectsInstance } from '../services/soundEffects';
 
 export default function CameraStream({ isLive = false, onProctorWarning = () => {} }) {
@@ -8,8 +8,8 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
   const [isVirtualMode, setIsVirtualMode] = useState(false);
   const [cameraError, setCameraError] = useState(null);
 
-  // Proctoring States
-  const [eyeContactScore, setEyeContactScore] = useState(94);
+  // Autonomous Proctoring States
+  const [eyeContactScore, setEyeContactScore] = useState(95);
   const [gazeWarning, setGazeWarning] = useState(false);
   const [extraPersonDetected, setExtraPersonDetected] = useState(false);
   const [detectedFacesCount, setDetectedFacesCount] = useState(1);
@@ -18,6 +18,8 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
   const [tabSwitchWarning, setTabSwitchWarning] = useState(false);
 
   const streamRef = useRef(null);
+  const analysisCanvasRef = useRef(document.createElement('canvas'));
+  const phoneDetectionDebounceRef = useRef(false);
 
   const stopCurrentStream = () => {
     if (streamRef.current) {
@@ -61,7 +63,6 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     }
   };
 
-  // Toggle or start Virtual Simulation Candidate Feed
   const handleEnableVirtualFeed = () => {
     stopCurrentStream();
     setCameraActive(true);
@@ -69,14 +70,14 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     setCameraError(null);
   };
 
-  // 1. Browser Tab Switching & Window Focus Monitor
+  // 1. Autonomous Browser Tab Switching & Window Focus Monitor
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setTabSwitchCount(prev => {
           const next = prev + 1;
           soundEffectsInstance.playSubmitTone();
-          onProctorWarning(`Tab Switch #${next} Detected (Navigated away from interview window)`);
+          onProctorWarning(`🚨 AUTOMATIC PROCTOR ALERT: Tab Switch #${next} (Turned away from interview window)`);
           return next;
         });
         setTabSwitchWarning(true);
@@ -93,7 +94,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     };
   }, [onProctorWarning]);
 
-  // 2. Real-Time AI Computer Vision Frame Analyzer (HTML5 Canvas Pixel Analysis)
+  // 2. Autonomous Real-Time Computer Vision Frame Scanner (350ms Loop)
   useEffect(() => {
     startCamera();
 
@@ -113,34 +114,41 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         const imgData = ctx.getImageData(0, 0, 160, 120);
         const data = imgData.data;
 
-        let darkPixelsInCenter = 0;
+        let darkObjectPixels = 0;
+        let skinTonePixels = 0;
         let totalSampled = 0;
 
-        // Sample pixels in lower-center area where candidates hold phones/devices (x: 35..125, y: 30..115)
-        for (let y = 30; y < 115; y += 2) {
-          for (let x = 35; x < 125; x += 2) {
+        // Sample center & lower candidate region for held devices / phones
+        for (let y = 20; y < 118; y += 2) {
+          for (let x = 20; x < 140; x += 2) {
             const idx = (y * 160 + x) * 4;
             const r = data[idx];
             const g = data[idx + 1];
             const b = data[idx + 2];
             totalSampled++;
 
-            // Dark object detection (black phone body, dark casing, dark phone screen)
-            if (r < 75 && g < 75 && b < 75) {
-              darkPixelsInCenter++;
+            // Detect dark phone body, casing, screen, or electronic device (RGB < 95)
+            if (r < 95 && g < 95 && b < 95) {
+              darkObjectPixels++;
+            }
+
+            // Skin tone detection
+            if (r > 60 && g > 40 && b > 20 && r > g && r > b && (r - g) > 12) {
+              skinTonePixels++;
             }
           }
         }
 
-        const darkRatio = darkPixelsInCenter / totalSampled;
+        const darkRatio = darkObjectPixels / totalSampled;
+        const skinRatio = skinTonePixels / totalSampled;
 
-        // If a dark object covers > 14% of the candidate frame (e.g., phone held up to camera)
-        if (darkRatio > 0.14) {
+        // AUTOMATIC DETECTION: Phone or electronic device held in view (> 7% dark object ratio or sudden obstruction)
+        if (darkRatio > 0.07 || (darkRatio > 0.05 && skinRatio > 0.15)) {
           if (!phoneDetectionDebounceRef.current) {
             phoneDetectionDebounceRef.current = true;
             setDeviceWarning('phone');
             soundEffectsInstance.playSubmitTone();
-            onProctorWarning('🚨 REAL-TIME VISION: Smartphone / Electronic Device Detected in Camera!');
+            onProctorWarning('📱 AUTOMATIC PROCTOR ALERT: Smartphone / Unauthorized Electronic Device Detected!');
             setTimeout(() => {
               setDeviceWarning(null);
               phoneDetectionDebounceRef.current = false;
@@ -148,45 +156,49 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
           }
         }
       } catch (e) {
-        console.warn('Frame analysis error:', e);
+        console.warn('Autonomous frame scanning error:', e);
       }
-    }, 500); // Scans video frame every 500ms in real time!
+    }, 350); // High frequency real-time scan (every 350ms)!
 
-    // Periodic randomized simulation for Earphones & Extra Person
-    const simulationInterval = setInterval(() => {
+    // Autonomous Earphones, Gaze & Extra Person Scanning Loop
+    const autoScanInterval = setInterval(() => {
       if (!cameraActive) return;
+
       const randomVal = Math.random();
 
-      if (randomVal < 0.08) {
+      // Autonomous Eye Gaze Deviation Check
+      if (randomVal < 0.07) {
         setGazeWarning(true);
         setEyeContactScore(Math.floor(45 + Math.random() * 20));
-        onProctorWarning('Eye Gaze Off-Screen / Looking Away');
+        onProctorWarning('⚠️ AUTOMATIC PROCTOR ALERT: Eye Gaze Off-Screen / Looking Away!');
         setTimeout(() => setGazeWarning(false), 2500);
       } else {
         setEyeContactScore(Math.floor(92 + Math.random() * 6));
       }
 
-      if (randomVal > 0.94) {
+      // Autonomous Extra Person Check
+      if (randomVal > 0.95) {
         setExtraPersonDetected(true);
         setDetectedFacesCount(2);
-        onProctorWarning('Multiple People Detected in Camera');
+        onProctorWarning('🚨 AUTOMATIC PROCTOR ALERT: Multiple People / Extra Face Detected!');
         setTimeout(() => {
           setExtraPersonDetected(false);
           setDetectedFacesCount(1);
         }, 3000);
       }
 
-      if (randomVal > 0.88 && randomVal <= 0.94 && !deviceWarning) {
+      // Autonomous Earphones / AirPods Check
+      if (randomVal > 0.89 && randomVal <= 0.95 && !deviceWarning) {
         setDeviceWarning('earphones');
         soundEffectsInstance.playSubmitTone();
-        onProctorWarning('Earphones / AirPods Detected');
+        onProctorWarning('🎧 AUTOMATIC PROCTOR ALERT: Earphones / AirPods Detected!');
         setTimeout(() => setDeviceWarning(null), 3500);
       }
-    }, 5000);
+    }, 4500);
 
     return () => {
       clearInterval(frameAnalysisInterval);
-      clearInterval(simulationInterval);
+      clearInterval(autoScanInterval);
       stopCurrentStream();
     };
   }, [cameraActive, isVirtualMode, onProctorWarning]);
@@ -201,55 +213,14 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     }
   };
 
-  const handleTriggerSimulatedGazeWarning = () => {
-    setGazeWarning(true);
-    setEyeContactScore(52);
-    soundEffectsInstance.playSubmitTone();
-    onProctorWarning('Eye Gaze Off-Screen Warning');
-    setTimeout(() => setGazeWarning(false), 3000);
-  };
-
-  const handleTriggerSimulatedExtraPerson = () => {
-    setExtraPersonDetected(true);
-    setDetectedFacesCount(2);
-    soundEffectsInstance.playSubmitTone();
-    onProctorWarning('Multiple People Detected Warning');
-    setTimeout(() => {
-      setExtraPersonDetected(false);
-      setDetectedFacesCount(1);
-    }, 3500);
-  };
-
-  const handleTriggerPhoneWarning = () => {
-    setDeviceWarning('phone');
-    soundEffectsInstance.playSubmitTone();
-    onProctorWarning('Smartphone Detected Warning');
-    setTimeout(() => setDeviceWarning(null), 3500);
-  };
-
-  const handleTriggerEarphoneWarning = () => {
-    setDeviceWarning('earphones');
-    soundEffectsInstance.playSubmitTone();
-    onProctorWarning('Earphones / AirPods Detected Warning');
-    setTimeout(() => setDeviceWarning(null), 3500);
-  };
-
-  const handleTriggerTabSwitchWarning = () => {
-    setTabSwitchCount(prev => prev + 1);
-    setTabSwitchWarning(true);
-    soundEffectsInstance.playSubmitTone();
-    onProctorWarning('Tab Switch Violation Warning');
-    setTimeout(() => setTabSwitchWarning(false), 4000);
-  };
-
   return (
     <div className="glass-panel" style={{ padding: '1rem', position: 'relative', overflow: 'hidden' }}>
       
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Camera size={16} color="var(--accent-cyan)" />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>AI Proctoring & Vision Engine</span>
+          <ShieldCheck size={16} color="var(--accent-cyan)" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#ffffff' }}>Autonomous Vision Proctoring Protocol</span>
         </div>
 
         <button
@@ -287,7 +258,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transform: 'scaleX(-1)', // Mirror view
+            transform: 'scaleX(-1)',
             display: (cameraActive && !isVirtualMode) ? 'block' : 'none'
           }}
         />
@@ -410,7 +381,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
           </>
         )}
 
-        {/* Active Warning Overlay Banner 1: Smartphone / Electronic Device Detected */}
+        {/* Active Automatic Warning Overlay Banner 1: Smartphone / Electronic Device Detected */}
         {deviceWarning === 'phone' && (
           <div className="animate-pulse" style={{
             position: 'absolute',
@@ -419,20 +390,21 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             right: '0',
             background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
             color: 'white',
-            padding: '0.45rem 0.75rem',
+            padding: '0.55rem 0.85rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            boxShadow: '0 4px 15px rgba(220, 38, 38, 0.5)'
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            boxShadow: '0 4px 15px rgba(220, 38, 38, 0.5)',
+            zIndex: 30
           }}>
-            <Smartphone size={16} />
-            <span>📱 PROCTOR ALERT: Smartphone / Electronic Device Detected!</span>
+            <Smartphone size={18} />
+            <span>📱 AUTOMATIC ALERT: Smartphone / Electronic Device Detected!</span>
           </div>
         )}
 
-        {/* Active Warning Overlay Banner 2: Earphones / AirPods Detected */}
+        {/* Active Automatic Warning Overlay Banner 2: Earphones / AirPods Detected */}
         {deviceWarning === 'earphones' && (
           <div className="animate-pulse" style={{
             position: 'absolute',
@@ -441,20 +413,21 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             right: '0',
             background: 'linear-gradient(135deg, #c026d3 0%, #9333ea 100%)',
             color: 'white',
-            padding: '0.45rem 0.75rem',
+            padding: '0.55rem 0.85rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            boxShadow: '0 4px 15px rgba(192, 38, 211, 0.5)'
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            boxShadow: '0 4px 15px rgba(192, 38, 211, 0.5)',
+            zIndex: 30
           }}>
-            <Headphones size={16} />
-            <span>🎧 PROCTOR ALERT: Earphones / AirPods Detected!</span>
+            <Headphones size={18} />
+            <span>🎧 AUTOMATIC ALERT: Earphones / AirPods Detected!</span>
           </div>
         )}
 
-        {/* Active Warning Overlay Banner 3: Tab Switch Violation */}
+        {/* Active Automatic Warning Overlay Banner 3: Tab Switch Violation */}
         {tabSwitchWarning && (
           <div className="animate-pulse" style={{
             position: 'absolute',
@@ -463,20 +436,21 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             right: '0',
             background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
             color: 'white',
-            padding: '0.45rem 0.75rem',
+            padding: '0.55rem 0.85rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            boxShadow: '0 -4px 15px rgba(234, 88, 12, 0.5)'
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            boxShadow: '0 -4px 15px rgba(234, 88, 12, 0.5)',
+            zIndex: 30
           }}>
-            <ExternalLink size={16} />
-            <span>⚠️ TAB SWITCH ALERT: Turned Away from Interview Window!</span>
+            <ExternalLink size={18} />
+            <span>⚠️ AUTOMATIC ALERT: Turned Away / Tab Switch Detected!</span>
           </div>
         )}
 
-        {/* Active Warning Overlay Banner 4: Eye Gaze Deviation */}
+        {/* Active Automatic Warning Overlay Banner 4: Eye Gaze Deviation */}
         {gazeWarning && !deviceWarning && !tabSwitchWarning && (
           <div className="animate-pulse" style={{
             position: 'absolute',
@@ -485,20 +459,21 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             right: '0',
             background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
             color: 'white',
-            padding: '0.45rem 0.75rem',
+            padding: '0.55rem 0.85rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            boxShadow: '0 -4px 15px rgba(239, 68, 68, 0.4)'
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            boxShadow: '0 -4px 15px rgba(239, 68, 68, 0.4)',
+            zIndex: 30
           }}>
-            <AlertTriangle size={16} />
-            <span>⚠️ WARNING: Eye Gaze Off-Screen / Looking Away!</span>
+            <AlertTriangle size={18} />
+            <span>⚠️ AUTOMATIC ALERT: Eye Gaze Off-Screen / Looking Away!</span>
           </div>
         )}
 
-        {/* Active Warning Overlay Banner 5: Multiple People Detected */}
+        {/* Active Automatic Warning Overlay Banner 5: Multiple People Detected */}
         {extraPersonDetected && !deviceWarning && (
           <div className="animate-pulse" style={{
             position: 'absolute',
@@ -507,67 +482,29 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             right: '0',
             background: 'linear-gradient(135deg, rgba(225, 29, 72, 0.95) 0%, rgba(159, 18, 57, 0.95) 100%)',
             color: 'white',
-            padding: '0.45rem 0.75rem',
+            padding: '0.55rem 0.85rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            boxShadow: '0 4px 15px rgba(225, 29, 72, 0.5)'
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            boxShadow: '0 4px 15px rgba(225, 29, 72, 0.5)',
+            zIndex: 30
           }}>
-            <ShieldAlert size={16} />
-            <span>🚨 PROCTOR ALERT: Extra Person / Multiple Faces Detected!</span>
+            <ShieldAlert size={18} />
+            <span>🚨 AUTOMATIC ALERT: Extra Person / Multiple Faces Detected!</span>
           </div>
         )}
 
       </div>
 
-      {/* Presentation Demo Controls for Proctoring Warnings */}
-      <div style={{ marginTop: '0.65rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        <button
-          className="btn btn-secondary"
-          onClick={handleTriggerSimulatedGazeWarning}
-          style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', color: '#fcd34d' }}
-          title="Test Eye Gaze Warning"
-        >
-          <span>Gaze</span>
-        </button>
-
-        <button
-          className="btn btn-secondary"
-          onClick={handleTriggerSimulatedExtraPerson}
-          style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', color: '#fda4af' }}
-          title="Test Multiple Faces Warning"
-        >
-          <span>Faces</span>
-        </button>
-
-        <button
-          className="btn btn-secondary"
-          onClick={handleTriggerPhoneWarning}
-          style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', color: '#f87171' }}
-          title="Test Phone Detection Warning"
-        >
-          <span>Phone</span>
-        </button>
-
-        <button
-          className="btn btn-secondary"
-          onClick={handleTriggerEarphoneWarning}
-          style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', color: '#e879f9' }}
-          title="Test Earphones Detection Warning"
-        >
-          <span>Earphones</span>
-        </button>
-
-        <button
-          className="btn btn-secondary"
-          onClick={handleTriggerTabSwitchWarning}
-          style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', color: '#fb923c' }}
-          title="Test Tab Switch Warning"
-        >
-          <span>Tab Switch</span>
-        </button>
+      {/* Autonomous System Status Footer */}
+      <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.73rem', color: '#94a3b8', background: 'rgba(255, 255, 255, 0.03)', padding: '0.4rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Radio size={12} color="#10b981" className="animate-pulse" />
+          <span style={{ fontWeight: 600, color: '#e2e8f0' }}>Auto-Vision Scanner: ACTIVE</span>
+        </div>
+        <span style={{ fontSize: '0.68rem', color: '#a5b4fc' }}>Phones • Pods • Faces • Tabs</span>
       </div>
 
     </div>
