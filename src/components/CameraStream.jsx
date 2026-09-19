@@ -35,22 +35,48 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     try {
       setCameraError(null);
       stopCurrentStream();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Browser media API not supported.');
+        setCameraActive(false);
+        return;
+      }
+
+      // Query available video inputs
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputDevices = devices.filter(d => d.kind === 'videoinput');
+        if (videoInputDevices.length === 0) {
+          setCameraError('No webcam hardware detected on this PC.');
+          setCameraActive(false);
+          return;
+        }
+      } catch (enumErr) {
+        console.warn('Enumerate devices warning:', enumErr);
+      }
       
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        },
         audio: false
       });
 
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(e => console.warn('Video play error:', e));
-      }
       setCameraActive(true);
       setIsVirtualMode(false);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(e => {
+          if (e.name !== 'AbortError') console.warn('Video play error:', e);
+        });
+      }
     } catch (err) {
-      console.warn('Camera access error:', err);
-      let msg = 'Camera access unavailable or blocked.';
+      console.warn('Camera access error details:', err.name, err.message);
+      let msg = 'Camera access blocked or unavailable.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         msg = 'Camera permission blocked by browser.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
@@ -62,6 +88,17 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       setCameraActive(false);
     }
   };
+
+  useEffect(() => {
+    if (cameraActive && !isVirtualMode && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch(e => {
+        if (e.name !== 'AbortError') console.warn('Video play error:', e);
+      });
+    }
+  }, [cameraActive, isVirtualMode]);
 
   const handleEnableVirtualFeed = () => {
     stopCurrentStream();
@@ -278,15 +315,30 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
 
         {/* Inactive or Permission Blocked Error Banner */}
         {!cameraActive && (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', maxWidth: '340px' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1rem', maxWidth: '360px' }}>
             <CameraOff size={32} style={{ marginBottom: '0.5rem', color: '#f43f5e', opacity: 0.8 }} />
             <div style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600, marginBottom: '0.4rem' }}>
               {cameraError || 'Webcam Stream Inactive'}
             </div>
             
-            <p style={{ fontSize: '0.73rem', color: '#94a3b8', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-              Click <strong>Allow</strong> in your browser address bar (left of localhost:8080) or switch to Virtual Candidate Feed below.
-            </p>
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.5rem',
+              fontSize: '0.72rem',
+              color: '#cbd5e1',
+              marginBottom: '0.75rem',
+              lineHeight: 1.45,
+              textAlign: 'left'
+            }}>
+              <strong>How to Allow Camera Permission:</strong>
+              <ol style={{ margin: '0.3rem 0 0 1.2rem', padding: 0 }}>
+                <li>Click the <strong>🔒 Lock icon</strong> or <strong>Tune icon</strong> in your browser URL bar (left of <code>localhost:8080</code>).</li>
+                <li>Set <strong>Camera</strong> to <strong>Allow</strong>.</li>
+                <li>Click <strong>[Retry Webcam]</strong> below.</li>
+              </ol>
+            </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
               <button
