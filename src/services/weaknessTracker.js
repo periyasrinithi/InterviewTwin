@@ -145,6 +145,9 @@ export class WeaknessTrackerService {
   /**
    * Auto-generate 7-Day Training Plan dynamically based on actual evaluated weakness graph
    */
+  /**
+   * Auto-generate 7-Day Training Plan dynamically based on actual evaluated weakness graph
+   */
   generate7DayTrainingPlan(weaknessGraph) {
     if (!weaknessGraph || !weaknessGraph.hasData) {
       return this.getDefaultTrainingPlan();
@@ -168,79 +171,113 @@ export class WeaknessTrackerService {
       {
         day: 1,
         title: `Day 1: ${topic1} Fundamentals`,
+        targetArea: topic1,
+        estimatedTime: '60 Mins',
         tasks: [
-          `Solve 3 Easy ${topic1} problems focusing on traversal logic`,
+          `Solve 3 Easy ${topic1} problems focusing on pointer & traversal logic`,
           `Practice 1 spoken explanation of ${topic1} memory structure`,
           `Review Big-O space complexity trade-offs`
         ],
-        targetArea: topic1,
-        estimatedTime: '60 Mins'
+        externalResources: [
+          { name: `Striver's A2Z ${topic1} Sheet`, platform: 'TakeUForward', url: 'https://takeuforward.org/strivers-a2z-dsa-course/strivers-a2z-dsa-course-sheet-2/', isPaid: false, type: 'Coding / DSA' },
+          { name: `NeetCode 150 ${topic1} Practice & Solutions`, platform: 'NeetCode.io', url: 'https://neetcode.io/roadmap', isPaid: false, type: 'Coding / DSA' },
+          { name: `Grokking the Coding Interview: ${topic1} Patterns`, platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-the-coding-interview', isPaid: true, price: 'Subscription', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 2,
         title: `Day 2: ${topic1} Intermediate & Edge Cases`,
+        targetArea: topic1,
+        estimatedTime: '75 Mins',
         tasks: [
-          `Solve 2 Medium ${topic1} problems`,
+          `Solve 2 Medium ${topic1} problems on LeetCode`,
           `Explain time complexity and recursion stack limits out loud`,
           `Record a 2-minute mock answer explaining recursive vs iterative approaches`
         ],
-        targetArea: topic1,
-        estimatedTime: '75 Mins'
+        externalResources: [
+          { name: `LeetCode 75 ${topic1} Study Plan`, platform: 'LeetCode', url: 'https://leetcode.com/studyplan/leetcode-75/', isPaid: false, type: 'Coding / DSA' },
+          { name: `MIT 6.006 Intro to Algorithms: ${topic1}`, platform: 'MIT OpenCourseWare', url: 'https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-fall-2011/', isPaid: false, type: 'Coding / DSA' },
+          { name: `AlgoExpert ${topic1} 160 Handpicked Questions`, platform: 'AlgoExpert', url: 'https://www.algoexpert.io/product', isPaid: true, price: '$99/yr', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 3,
         title: `Day 3: ${topic2} (BFS & DFS Traversals)`,
+        targetArea: topic2,
+        estimatedTime: '60 Mins',
         tasks: [
           `Implement BFS (Queue) and DFS (Stack/Recursion) for ${topic2}`,
           `Solve 2 Graph/Tree traversal interview problems`,
           `Complete mini voice drill on shortest path algorithms`
         ],
-        targetArea: topic2,
-        estimatedTime: '60 Mins'
+        externalResources: [
+          { name: `GeeksforGeeks ${topic2} Complete Guide`, platform: 'GeeksforGeeks', url: 'https://www.geeksforgeeks.org/graph-data-structure-and-algorithms/', isPaid: false, type: 'Coding / DSA' },
+          { name: `Udemy: Master Data Structures & Algorithms by Abdul Bari`, platform: 'Udemy', url: 'https://www.udemy.com/course/datastructurescncpp/', isPaid: true, price: '~$14', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 4,
-        title: 'Day 4: Dynamic Programming & Recursion',
+        title: 'Day 4: Dynamic Programming & Recursion Masterclass',
+        targetArea: 'Dynamic Programming',
+        estimatedTime: '90 Mins',
         tasks: [
           `Master Top-Down Memoization vs Bottom-Up Tabulation`,
           `Solve 3 classic DP problems (Climbing Stairs, Coin Change, Knapsack)`,
           `Explain state transition equations out loud`
         ],
-        targetArea: 'Dynamic Programming',
-        estimatedTime: '90 Mins'
+        externalResources: [
+          { name: 'Striver DP Series (Top 50 DP Problems)', platform: 'TakeUForward', url: 'https://takeuforward.org/dynamic-programming/striver-dp-series-top-dp-problems/', isPaid: false, type: 'Coding / DSA' },
+          { name: 'Grokking Dynamic Programming Patterns', platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-dynamic-programming-patterns-for-coding-interviews', isPaid: true, price: 'Subscription', type: 'Coding / DSA' },
+          { name: 'Dynamic Programming Master Course by Coding Minutes', platform: 'Udemy', url: 'https://www.udemy.com/course/dynamic-programming-master-course-coding-minutes/', isPaid: true, price: '~$14', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 5,
         title: 'Day 5: Anti-Memorization STAR & Ownership Drills',
+        targetArea: 'Communication & STAR Structure',
+        estimatedTime: '45 Mins',
         tasks: [
           `Re-structure your behavioral stories to highlight YOUR specific contributions`,
           `Eliminate generic words ("hardworking", "team player") with quantitative metrics`,
           `Complete 2 STAR behavioral drills focusing on Specificity & Evidence`
         ],
-        targetArea: 'Communication & STAR Structure',
-        estimatedTime: '45 Mins'
+        externalResources: [
+          { name: 'Complete STAR Method Answer Guide & Story Bank', platform: 'The Muse', url: 'https://www.themuse.com/advice/star-interview-method', isPaid: false, type: 'Behavioral & HR' },
+          { name: 'Harvard Business Review Communication & Presentation Guide', platform: 'HBR', url: 'https://hbr.org/topic/subject/presentation-skills', isPaid: false, type: 'Behavioral & HR' },
+          { name: 'Executive Speaking & Behavioral Interview Masterclass', platform: 'Udemy', url: 'https://www.udemy.com/course/complete-interview-answer-guide/', isPaid: true, price: '~$14', type: 'Behavioral & HR' }
+        ]
       },
       {
         day: 6,
-        title: 'Day 6: Core Technical Stack & DBMS Deep-Dive',
+        title: 'Day 6: Core Technical Stack & System Design Deep-Dive',
+        targetArea: 'System Design & Technical Stack',
+        estimatedTime: '60 Mins',
         tasks: [
           `Review Java JVM Heap vs Stack memory and Thread Safety`,
           `Practice SQL indexing (B-Trees) and ACID transaction explanations`,
           `Mock 15-minute System Design & Architecture review`
         ],
-        targetArea: 'Technical Stack',
-        estimatedTime: '60 Mins'
+        externalResources: [
+          { name: 'The System Design Primer (GitHub - 250k+ Stars)', platform: 'GitHub', url: 'https://github.com/donnemartin/system-design-primer', isPaid: false, type: 'System Design' },
+          { name: 'ByteByteGo System Design YouTube Channel', platform: 'YouTube / ByteByteGo', url: 'https://www.youtube.com/@ByteByteGo', isPaid: false, type: 'System Design' },
+          { name: 'Grokking Modern System Design for Engineers', platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-modern-system-design-for-software-engineers', isPaid: true, price: 'Subscription', type: 'System Design' },
+          { name: 'SystemsExpert Architecture & System Design', platform: 'SystemsExpert', url: 'https://www.algoexpert.io/systems/product', isPaid: true, price: 'Paid', type: 'System Design' }
+        ]
       },
       {
         day: 7,
         title: 'Day 7: Full Adaptive Re-Interview Session',
+        targetArea: 'Re-Interview Verification',
+        estimatedTime: '45 Mins',
         tasks: [
           `Take Full Adaptive AI Re-Interview`,
           `Compare Interview #2 score against Interview #1 baseline`,
           `Verify skill gap reductions and filler word improvements`
         ],
-        targetArea: 'Re-Interview Verification',
-        estimatedTime: '45 Mins'
+        externalResources: [
+          { name: 'InterviewTwin Adaptive Verification Round', platform: 'InterviewTwin AI', url: '#', isPaid: false, type: 'AI Verification' },
+          { name: 'LeetCode Premium Targeted Company Mock Exams', platform: 'LeetCode', url: 'https://leetcode.com/subscribe/', isPaid: true, price: '$35/mo', type: 'Company Mocks' }
+        ]
       }
     ];
   }
@@ -250,51 +287,80 @@ export class WeaknessTrackerService {
       {
         day: 1,
         title: 'Day 1: Initial Skill Diagnostic & Arrays',
-        tasks: ['Complete your first Diagnostic Interview', 'Review array traversal techniques'],
         targetArea: 'Diagnostic Baseline',
-        estimatedTime: '45 Mins'
+        estimatedTime: '45 Mins',
+        tasks: ['Complete your first Diagnostic Interview', 'Review array traversal techniques'],
+        externalResources: [
+          { name: "Striver's A2Z DSA Sheet", platform: 'TakeUForward', url: 'https://takeuforward.org/strivers-a2z-dsa-course/strivers-a2z-dsa-course-sheet-2/', isPaid: false, type: 'Coding / DSA' },
+          { name: 'NeetCode 150 Practice Roadmap', platform: 'NeetCode.io', url: 'https://neetcode.io/roadmap', isPaid: false, type: 'Coding / DSA' },
+          { name: 'Grokking the Coding Interview', platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-the-coding-interview', isPaid: true, price: 'Subscription', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 2,
         title: 'Day 2: Binary Trees & Recursion',
-        tasks: ['Solve 2 Tree problems', 'Explain recursion stack limits'],
         targetArea: 'Trees',
-        estimatedTime: '60 Mins'
+        estimatedTime: '60 Mins',
+        tasks: ['Solve 2 Tree problems', 'Explain recursion stack limits'],
+        externalResources: [
+          { name: 'LeetCode Tree Study Plan', platform: 'LeetCode', url: 'https://leetcode.com/studyplan/leetcode-75/', isPaid: false, type: 'Coding / DSA' },
+          { name: 'AlgoExpert Data Structures & Trees', platform: 'AlgoExpert', url: 'https://www.algoexpert.io/product', isPaid: true, price: '$99/yr', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 3,
         title: 'Day 3: Graphs (BFS & DFS)',
-        tasks: ['Implement Queue-based BFS', 'Solve 2 graph traversal questions'],
         targetArea: 'Graphs',
-        estimatedTime: '60 Mins'
+        estimatedTime: '60 Mins',
+        tasks: ['Implement Queue-based BFS', 'Solve 2 graph traversal questions'],
+        externalResources: [
+          { name: 'GeeksforGeeks Graph Algorithms', platform: 'GeeksforGeeks', url: 'https://www.geeksforgeeks.org/graph-data-structure-and-algorithms/', isPaid: false, type: 'Coding / DSA' },
+          { name: 'Udemy DSA Masterclass by Abdul Bari', platform: 'Udemy', url: 'https://www.udemy.com/course/datastructurescncpp/', isPaid: true, price: '~$14', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 4,
         title: 'Day 4: Dynamic Programming Basics',
-        tasks: ['Memoization vs Tabulation', 'Solve 2 DP problems'],
         targetArea: 'Dynamic Programming',
-        estimatedTime: '75 Mins'
+        estimatedTime: '75 Mins',
+        tasks: ['Memoization vs Tabulation', 'Solve 2 DP problems'],
+        externalResources: [
+          { name: 'Striver DP Series (Top 50 DP Problems)', platform: 'TakeUForward', url: 'https://takeuforward.org/dynamic-programming/striver-dp-series-top-dp-problems/', isPaid: false, type: 'Coding / DSA' },
+          { name: 'Grokking Dynamic Programming Patterns', platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-dynamic-programming-patterns-for-coding-interviews', isPaid: true, price: 'Subscription', type: 'Coding / DSA' }
+        ]
       },
       {
         day: 5,
         title: 'Day 5: Behavioral STAR Specificity',
-        tasks: ['Eliminate generic words', 'Quantify personal achievements'],
         targetArea: 'Behavioral',
-        estimatedTime: '45 Mins'
+        estimatedTime: '45 Mins',
+        tasks: ['Eliminate generic words', 'Quantify personal achievements'],
+        externalResources: [
+          { name: 'STAR Method Interview Guide', platform: 'The Muse', url: 'https://www.themuse.com/advice/star-interview-method', isPaid: false, type: 'Behavioral & HR' },
+          { name: 'Executive Behavioral Answer Guide', platform: 'Udemy', url: 'https://www.udemy.com/course/complete-interview-answer-guide/', isPaid: true, price: '~$14', type: 'Behavioral & HR' }
+        ]
       },
       {
         day: 6,
-        title: 'Day 6: DBMS & Java Concurrency',
-        tasks: ['Review SQL B-Tree indexes', 'Java Thread Safety'],
+        title: 'Day 6: DBMS & System Design',
         targetArea: 'Technical Stack',
-        estimatedTime: '60 Mins'
+        estimatedTime: '60 Mins',
+        tasks: ['Review SQL B-Tree indexes', 'System Design Fundamentals'],
+        externalResources: [
+          { name: 'System Design Primer (GitHub - 250k+ Stars)', platform: 'GitHub', url: 'https://github.com/donnemartin/system-design-primer', isPaid: false, type: 'System Design' },
+          { name: 'Grokking Modern System Design', platform: 'Educative.io', url: 'https://www.educative.io/courses/grokking-modern-system-design-for-software-engineers', isPaid: true, price: 'Subscription', type: 'System Design' }
+        ]
       },
       {
         day: 7,
         title: 'Day 7: Adaptive Re-Interview',
-        tasks: ['Launch Re-Interview', 'Verify improvement delta'],
         targetArea: 'Verification',
-        estimatedTime: '45 Mins'
+        estimatedTime: '45 Mins',
+        tasks: ['Launch Re-Interview', 'Verify improvement delta'],
+        externalResources: [
+          { name: 'InterviewTwin Adaptive Verification', platform: 'InterviewTwin AI', url: '#', isPaid: false, type: 'AI Verification' },
+          { name: 'LeetCode Premium Mock Exams', platform: 'LeetCode', url: 'https://leetcode.com/subscribe/', isPaid: true, price: '$35/mo', type: 'Company Mocks' }
+        ]
       }
     ];
   }
