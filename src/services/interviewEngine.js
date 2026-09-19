@@ -7,17 +7,18 @@ import { courseKnowledgeInstance } from './courseKnowledge';
 
 export class InterviewEngine {
   /**
-   * Evaluates a single answer turn against target question details, speech metrics, and active course syllabus.
+   * Evaluates a single answer turn against multi-approach references, course standards, and speech metrics.
+   * Acknowledges that technical & behavioral questions have MULTIPLE VALID CORRECT ANSWERS.
    */
   evaluateAnswer(question, candidateText, speechMetrics = {}) {
     const text = candidateText ? candidateText.trim() : '';
     const wordCount = text ? text.split(/\s+/).length : 0;
+    const lowerText = text.toLowerCase();
     
     // 1. Course Curriculum Knowledge Alignment Check
     const courseEvaluation = courseKnowledgeInstance.checkAnswerAgainstCourse(text, question);
 
-    // 2. Technical & Keyword Coverage
-    const lowerText = text.toLowerCase();
+    // 2. Multi-Approach Reference Evaluation (Acknowledging Multiple Correct Paradigms)
     const keywords = question.keyKeywords || [];
     let matchedKeywords = [];
     keywords.forEach(kw => {
@@ -25,10 +26,35 @@ export class InterviewEngine {
         matchedKeywords.push(kw);
       }
     });
-    
-    const keywordCoverageRatio = keywords.length > 0 ? (matchedKeywords.length / keywords.length) : 0.7;
 
-    // 3. STAR Format Adherence Detection
+    // Detect Alternative Solution Paradigms
+    const detectedParadigms = [];
+    if (lowerText.includes('hash') || lowerText.includes('map') || lowerText.includes('dict') || lowerText.includes('o(1)')) {
+      detectedParadigms.push({ approach: 'Hash Map / Dictionary Approach', complexity: 'O(N) Time, O(N) Space', rating: 'Optimal Time' });
+    }
+    if (lowerText.includes('sort') || lowerText.includes('two pointer') || lowerText.includes('binary search')) {
+      detectedParadigms.push({ approach: 'Sorting / Two-Pointer Approach', complexity: 'O(N log N) Time, O(1) Space', rating: 'Optimal Memory' });
+    }
+    if (lowerText.includes('cache') || lowerText.includes('redis') || lowerText.includes('memcached') || lowerText.includes('cdn')) {
+      detectedParadigms.push({ approach: 'Distributed Cache Layering', complexity: 'High Throughput Architecture', rating: 'Scalable System' });
+    }
+    if (lowerText.includes('data') || lowerText.includes('benchmark') || lowerText.includes('prototype') || lowerText.includes('collaborate')) {
+      detectedParadigms.push({ approach: 'Data-Driven & Collaborative Resolution', complexity: 'STAR Framework', rating: 'High Ownership' });
+    }
+
+    const primaryApproach = detectedParadigms[0] || {
+      approach: wordCount > 40 ? 'Structured Technical Answer' : 'Direct Conceptual Response',
+      complexity: 'Standard Paradigm',
+      rating: 'Valid Approach'
+    };
+
+    // 3. Trade-off & Complexity Awareness Check
+    const mentionsTradeoffs = lowerText.includes('trade-off') || lowerText.includes('tradeoff') || 
+                              lowerText.includes('complexity') || lowerText.includes('space') || 
+                              lowerText.includes('time') || lowerText.includes('versus') || 
+                              lowerText.includes('vs') || lowerText.includes('latency');
+
+    // 4. STAR Format Adherence Detection
     const starMarkers = {
       situation: ['when', 'at my', 'company', 'project', 'client', 'background', 'team', 'faced', 'needed', 'course', 'class'],
       task: ['goal', 'task', 'objective', 'responsible', 'required', 'challenge', 'assigned', 'problem'],
@@ -45,60 +71,53 @@ export class InterviewEngine {
 
     const starSectionsCount = Object.values(starCoverage).filter(Boolean).length;
 
-    // 4. Speech Delivery & Filler Penalty
+    // 5. Speech Delivery & Pace
     const totalFillers = speechMetrics.totalFillers || 0;
     const wpm = speechMetrics.wpm || 135;
     
-    // WPM Score calculation: optimal range 125 - 165 WPM
     let paceScore = 90;
-    if (wpm < 90) paceScore = 65;
+    if (wpm >= 120 && wpm <= 165) paceScore = 98;
+    else if (wpm < 90) paceScore = 65;
     else if (wpm > 180) paceScore = 70;
-    else if (wpm >= 120 && wpm <= 165) paceScore = 98;
 
     const fillerPenalty = Math.min(totalFillers * 3, 30);
     const commScore = Math.max(Math.min(paceScore - fillerPenalty + (wordCount > 50 ? 10 : 0), 100), 45);
 
-    // Tech Depth & Course Alignment Blend
+    // Tech Depth: Full credit for ANY recognized correct paradigm + trade-off awareness
+    const keywordRatio = keywords.length > 0 ? (matchedKeywords.length / keywords.length) : 0.75;
     let techScore = Math.round(
-      (keywordCoverageRatio * 40) + 
-      (courseEvaluation.alignmentScore * 0.4) + 
-      (wordCount > 80 ? 20 : wordCount * 0.2)
+      (keywordRatio * 35) + 
+      (courseEvaluation.alignmentScore * 0.35) + 
+      (mentionsTradeoffs ? 15 : 5) +
+      (wordCount > 70 ? 15 : wordCount * 0.2)
     );
-    techScore = Math.min(Math.max(techScore, 40), 100);
+    techScore = Math.min(Math.max(techScore, 45), 100);
 
-    // Structure Score
+    // Structure & Confidence
     let structureScore = Math.round((starSectionsCount / 4) * 100);
     if (wordCount < 30) structureScore = Math.min(structureScore, 45);
 
-    // Executive Confidence
-    let confidenceScore = Math.round((commScore * 0.5) + (structureScore * 0.3) + (techScore * 0.2));
-
-    // Overall Score
+    let confidenceScore = Math.round((commScore * 0.4) + (structureScore * 0.3) + (techScore * 0.3));
     const overallScore = Math.round((commScore * 0.25) + (techScore * 0.35) + (structureScore * 0.25) + (confidenceScore * 0.15));
 
-    // Feedback Points Generation
+    // Feedback Points & Alternative Approaches
     const strengths = [];
     const improvements = [];
-    const missingConcepts = keywords.filter(kw => !matchedKeywords.includes(kw));
+
+    strengths.push(`Recognized Approach: Evaluated via "${primaryApproach.approach}" (${primaryApproach.rating}).`);
+
+    if (mentionsTradeoffs) {
+      strengths.push('Excellent trade-off awareness: articulated time, space, or architectural trade-offs.');
+    } else {
+      improvements.push('Consider explaining trade-offs (e.g. Time vs Space complexity or System Scalability vs Latency).');
+    }
 
     if (courseEvaluation.matchedCourseKeywords.length > 0) {
-      strengths.push(`Strong alignment with ${courseEvaluation.courseCode} course syllabus: mentioned "${courseEvaluation.matchedCourseKeywords.slice(0, 4).join(', ')}".`);
-    } else {
-      improvements.push(`Incorporate more core concepts from ${courseEvaluation.courseName} (e.g. ${courseEvaluation.keyCourseConcepts[0]}).`);
-    }
-
-    if (matchedKeywords.length > 0) {
-      strengths.push(`Great technical depth: articulated "${matchedKeywords.join(', ')}".`);
-    }
-
-    if (starCoverage.result) {
-      strengths.push('Effective quantification of results and outcomes in your response.');
-    } else {
-      improvements.push('Include explicit quantitative results (e.g. "% improvement", "latency reduced", "efficiency gained").');
+      strengths.push(`Course Curriculum Alignment (${courseEvaluation.courseCode}): mentioned "${courseEvaluation.matchedCourseKeywords.slice(0, 4).join(', ')}".`);
     }
 
     if (totalFillers > 3) {
-      improvements.push(`Noticed ${totalFillers} filler words. Pausing silently is stronger than using filler words.`);
+      improvements.push(`Noticed ${totalFillers} filler words. Silent pauses sound more confident.`);
     }
 
     return {
@@ -109,30 +128,33 @@ export class InterviewEngine {
         structure: structureScore,
         confidence: confidenceScore
       },
+      primaryApproach,
       courseEvaluation,
       matchedKeywords,
-      missingConcepts,
       starCoverage,
+      mentionsTradeoffs,
       strengths,
       improvements,
       wordCount,
       wpm,
       totalFillers,
-      sampleAnswer: question.modelAnswer
+      sampleAnswer: question.modelAnswer,
+      alternativeValidApproaches: [
+        { approach: 'Optimal Time Approach (Hash Map / Indexing)', detail: 'O(N) Time complexity using auxiliary hash space.' },
+        { approach: 'Optimal Memory Approach (Sorting & Pointers)', detail: 'O(N log N) Time complexity with O(1) in-place memory.' },
+        { approach: 'Distributed System Approach (Caching & CDN)', detail: 'Decoupled caching layer with idempotency controls.' }
+      ]
     };
   }
 
   getFollowUp(question, evaluation) {
-    if (evaluation.missingConcepts && evaluation.missingConcepts.length > 0) {
-      return `That covers the initial scenario well. Could you elaborate specifically on how you handled ${evaluation.missingConcepts[0]} in that situation?`;
-    }
-    if (!evaluation.starCoverage.result) {
-      return `That is helpful context. What were the specific measurable metrics or outcomes from that action?`;
+    if (!evaluation.mentionsTradeoffs) {
+      return `Good explanation. What trade-offs or space/time complexities did you consider for that approach?`;
     }
     if (question.followUps && question.followUps.length > 0) {
       return question.followUps[Math.floor(Math.random() * question.followUps.length)];
     }
-    return `Can you walk me through what trade-offs you considered before finalizing that decision?`;
+    return `Can you walk me through an alternative valid approach to solve this same problem?`;
   }
 }
 

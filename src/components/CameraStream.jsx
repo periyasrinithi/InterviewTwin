@@ -94,12 +94,12 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     };
   }, [onProctorWarning]);
 
-  // 2. Autonomous Real-Time Computer Vision Frame Scanner (350ms Loop)
+  // 2. Autonomous Real-Time Computer Vision Frame Scanner (Smooth & Glitch-Free)
   useEffect(() => {
     startCamera();
 
     const frameAnalysisInterval = setInterval(() => {
-      if (!cameraActive || isVirtualMode) return;
+      if (!streamRef.current) return;
 
       const videoEl = videoRef.current;
       if (!videoEl || videoEl.readyState !== 4) return;
@@ -142,7 +142,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         const darkRatio = darkObjectPixels / totalSampled;
         const skinRatio = skinTonePixels / totalSampled;
 
-        // AUTOMATIC DETECTION: Phone or electronic device held in view (> 7% dark object ratio or sudden obstruction)
+        // AUTOMATIC DETECTION: Phone or electronic device held in view (> 7% dark object ratio)
         if (darkRatio > 0.07 || (darkRatio > 0.05 && skinRatio > 0.15)) {
           if (!phoneDetectionDebounceRef.current) {
             phoneDetectionDebounceRef.current = true;
@@ -158,11 +158,11 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       } catch (e) {
         console.warn('Autonomous frame scanning error:', e);
       }
-    }, 350); // High frequency real-time scan (every 350ms)!
+    }, 400); // Smooth 400ms scan interval
 
     // Autonomous Earphones, Gaze & Extra Person Scanning Loop
     const autoScanInterval = setInterval(() => {
-      if (!cameraActive) return;
+      if (!streamRef.current) return;
 
       const randomVal = Math.random();
 
@@ -201,7 +201,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       clearInterval(autoScanInterval);
       stopCurrentStream();
     };
-  }, [cameraActive, isVirtualMode, onProctorWarning]);
+  }, []); // Run ONCE on mount to ensure smooth, glitch-free video playback!
 
   const handleToggleCamera = () => {
     if (cameraActive) {
