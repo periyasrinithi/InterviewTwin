@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, Eye, AlertTriangle, Users, ShieldAlert, CheckCircle2, RefreshCw, Video, Smartphone, Headphones, ExternalLink, ShieldCheck, Radio } from 'lucide-react';
 import { soundEffectsInstance } from '../services/soundEffects';
+import { initProctorModels, analyzeVideoFrame } from '../services/proctorVisionService';
+
+const PROCTOR_DEBUG = false; // Developer debug flag for testing models
 
 export default function CameraStream({ isLive = false, onProctorWarning = () => {} }) {
   const videoRef = useRef(null);
@@ -18,7 +21,6 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
   const [tabSwitchWarning, setTabSwitchWarning] = useState(false);
 
   const streamRef = useRef(null);
-  const analysisCanvasRef = useRef(document.createElement('canvas'));
   const phoneDetectionDebounceRef = useRef(false);
 
   const stopCurrentStream = () => {
@@ -107,14 +109,17 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     setCameraError(null);
   };
 
-  // 1. Autonomous Browser Tab Switching & Window Focus Monitor
+  // 1. Autonomous Browser Tab Switching & Window Focus Monitor (Deduplicated)
   useEffect(() => {
+    let lastTabOrBlurTime = 0;
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        lastTabOrBlurTime = Date.now();
         setTabSwitchCount(prev => {
           const next = prev + 1;
           soundEffectsInstance.playSubmitTone();
-          onProctorWarning(`🚨 AUTOMATIC PROCTOR ALERT: Tab Switch #${next} (Turned away from interview window)`);
+          onProctorWarning(`🚨 TAB_SWITCH: Interview tab was left. (Switch #${next})`);
           return next;
         });
         setTabSwitchWarning(true);
@@ -122,111 +127,120 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       }
     };
 
+    const handleBlur = () => {
+      const now = Date.now();
+      // Avoid firing duplicate event if visibilitychange already fired within 1000ms
+      if (now - lastTabOrBlurTime < 1000) return;
+      if (!document.hidden) {
+        lastTabOrBlurTime = now;
+        soundEffectsInstance.playSubmitTone();
+        onProctorWarning(`⚠️ WINDOW_BLUR: Interview window lost focus.`);
+        setTabSwitchWarning(true);
+        setTimeout(() => setTabSwitchWarning(false), 4500);
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
     };
   }, [onProctorWarning]);
 
-  // 2. Real-Time Empirical Computer Vision Scanner (Zero False Accusations)
+  // 2. Real-Time AI Computer Vision Scanner (BlazeFace + COCO-SSD)
   useEffect(() => {
     startCamera();
 
-    const frameAnalysisInterval = setInterval(() => {
-      if (!streamRef.current) return;
+    let consecutiveFacesCount = 0;
+    let consecutiveGazeCount = 0;
+    let consecutiveDeviceCount = 0;
+
+    let lastFaceAlertTime = 0;
+    let lastGazeAlertTime = 0;
+    let lastDeviceAlertTime = 0;
+
+    initProctorModels();
+
+    const frameAnalysisInterval = setInterval(async () => {
+      // RULE: Do NOT perform AI vision inference in Virtual Feed mode or when camera inactive!
+      if (!streamRef.current || isVirtualMode || !cameraActive) return;
 
       const videoEl = videoRef.current;
       if (!videoEl || videoEl.readyState !== 4) return;
 
       try {
-        const canvas = analysisCanvasRef.current;
-        canvas.width = 160;
-        canvas.height = 120;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(videoEl, 0, 0, 160, 120);
+        const result = await analyzeVideoFrame(videoEl);
+        if (!result) return;
 
-        const imgData = ctx.getImageData(0, 0, 160, 120);
-        const data = imgData.data;
+        const now = Date.now();
+        const ALERT_COOLDOWN_MS = 6000;
 
-        let leftFaceSkin = 0;
-        let rightFaceSkin = 0;
-        let centerFaceSkin = 0;
-        let darkObstructionPixels = 0;
+        // 1. MULTIPLE FACES DETECTION (Real BlazeFace model face count)
+        const count = result.faceCount || 1;
+        setDetectedFacesCount(count);
 
-        // Sample candidate frame pixels
-        for (let y = 15; y < 110; y += 2) {
-          for (let x = 10; x < 150; x += 2) {
-            const idx = (y * 160 + x) * 4;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-
-            // Skin tone color classifier: R > G > B & R > 55
-            const isSkin = (r > 55 && g > 35 && b > 20 && r > g && r > b && (r - g) > 10);
-
-            if (isSkin) {
-              if (x < 55) leftFaceSkin++;
-              else if (x > 105) rightFaceSkin++;
-              else centerFaceSkin++;
-            }
-
-            // Dark handheld device obstruction classifier (held close to center/face, RGB < 45)
-            if (y > 35 && y < 105 && x > 45 && x < 115) {
-              if (r < 45 && g < 45 && b < 45) {
-                darkObstructionPixels++;
-              }
+        if (count >= 2) {
+          consecutiveFacesCount++;
+          if (consecutiveFacesCount >= 2) {
+            setExtraPersonDetected(true);
+            if (now - lastFaceAlertTime > ALERT_COOLDOWN_MS) {
+              lastFaceAlertTime = now;
+              soundEffectsInstance.playSubmitTone();
+              onProctorWarning('🚨 MULTIPLE_FACES: Multiple people detected in the camera frame.');
             }
           }
-        }
-
-        // 1. EMPIRICAL MULTIPLE PEOPLE DETECTION:
-        // Set 2 faces ONLY if distinct, isolated face skin clusters exist on BOTH far left AND far right
-        if (leftFaceSkin > 140 && rightFaceSkin > 140 && centerFaceSkin < 50) {
-          setDetectedFacesCount(2);
-          setExtraPersonDetected(true);
         } else {
-          setDetectedFacesCount(1);
+          consecutiveFacesCount = 0;
           setExtraPersonDetected(false);
         }
 
-        // 2. EMPIRICAL GAZE & EYE CONTACT:
-        // High eye contact when candidate face is in center frame
-        if (centerFaceSkin > 80 || (leftFaceSkin > 40 && rightFaceSkin > 40)) {
-          setEyeContactScore(98);
+        // 2. GAZE & ATTENTION DEVIATION (BlazeFace landmarks offset)
+        setEyeContactScore(result.gazeScore);
+        if (result.isLookingAway) {
+          consecutiveGazeCount++;
+          if (consecutiveGazeCount >= 3) {
+            setGazeWarning(true);
+            if (now - lastGazeAlertTime > ALERT_COOLDOWN_MS) {
+              lastGazeAlertTime = now;
+              soundEffectsInstance.playSubmitTone();
+              onProctorWarning('⚠️ GAZE_DEVIATION: Candidate attention appears to be directed away from the screen.');
+            }
+          }
+        } else {
+          consecutiveGazeCount = 0;
           setGazeWarning(false);
-        } else if (centerFaceSkin < 15 && leftFaceSkin < 15 && rightFaceSkin < 15) {
-          setEyeContactScore(42);
-          setGazeWarning(true);
         }
 
-        // 3. EMPIRICAL SMARTPHONE OBSTRUCTION DETECTION:
-        // Requires a dense black phone body/screen obstructing > 35% of center frame
-        if (darkObstructionPixels > 700) {
-          if (!phoneDetectionDebounceRef.current) {
-            phoneDetectionDebounceRef.current = true;
-            setDeviceWarning('phone');
-            soundEffectsInstance.playSubmitTone();
-            onProctorWarning('📱 AUTOMATIC PROCTOR ALERT: Smartphone / Electronic Device Obstructing Camera!');
-            setTimeout(() => {
-              setDeviceWarning(null);
-              phoneDetectionDebounceRef.current = false;
-            }, 4500);
+        // 3. ELECTRONIC DEVICE & EARPHONE DETECTION (COCO-SSD model)
+        if (result.hasPhone || result.hasOtherDevice || result.hasEarphones) {
+          consecutiveDeviceCount++;
+          if (consecutiveDeviceCount >= 2) {
+            const warningType = result.hasEarphones ? 'earphones' : 'phone';
+            setDeviceWarning(warningType);
+            if (now - lastDeviceAlertTime > ALERT_COOLDOWN_MS) {
+              lastDeviceAlertTime = now;
+              soundEffectsInstance.playSubmitTone();
+              const label = result.detectedDeviceLabel || 'electronic device';
+              onProctorWarning(`📱 ELECTRONIC_DEVICE: A mobile ${label} was detected.`);
+            }
           }
+        } else {
+          consecutiveDeviceCount = 0;
+          setDeviceWarning(null);
         }
 
       } catch (e) {
-        console.warn('Empirical vision frame scanning error:', e);
+        console.warn('Real AI vision frame scanning error:', e);
       }
-    }, 500);
+    }, 250); // 250ms throttled cycle
 
     return () => {
       clearInterval(frameAnalysisInterval);
       stopCurrentStream();
     };
-  }, []); // Run ONCE on mount to ensure smooth, glitch-free video playback!
+  }, [isVirtualMode, cameraActive]); // Run ONCE on mount to ensure smooth, glitch-free video playback!
 
   const handleToggleCamera = () => {
     if (cameraActive) {
