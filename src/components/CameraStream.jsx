@@ -116,14 +116,14 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         lastTabOrBlurTime = Date.now();
-        setTabSwitchCount(prev => {
-          const next = prev + 1;
-          soundEffectsInstance.playSubmitTone();
-          onProctorWarning(`🚨 TAB_SWITCH: Interview tab was left. (Switch #${next})`);
-          return next;
-        });
+        setTabSwitchCount(prev => prev + 1);
+        soundEffectsInstance.playSubmitTone();
         setTabSwitchWarning(true);
         setTimeout(() => setTabSwitchWarning(false), 4500);
+
+        setTimeout(() => {
+          onProctorWarning(`🚨 TAB_SWITCH: Interview tab was left.`);
+        }, 0);
       }
     };
 
@@ -134,9 +134,12 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       if (!document.hidden) {
         lastTabOrBlurTime = now;
         soundEffectsInstance.playSubmitTone();
-        onProctorWarning(`⚠️ WINDOW_BLUR: Interview window lost focus.`);
         setTabSwitchWarning(true);
         setTimeout(() => setTabSwitchWarning(false), 4500);
+
+        setTimeout(() => {
+          onProctorWarning(`⚠️ WINDOW_BLUR: Interview window lost focus.`);
+        }, 0);
       }
     };
 
@@ -188,7 +191,9 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             if (now - lastFaceAlertTime > ALERT_COOLDOWN_MS) {
               lastFaceAlertTime = now;
               soundEffectsInstance.playSubmitTone();
-              onProctorWarning('🚨 MULTIPLE_FACES: Multiple people detected in the camera frame.');
+              setTimeout(() => {
+                onProctorWarning('🚨 MULTIPLE_FACES: Multiple people detected in the camera frame.');
+              }, 0);
             }
           }
         } else {
@@ -205,7 +210,9 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             if (now - lastGazeAlertTime > ALERT_COOLDOWN_MS) {
               lastGazeAlertTime = now;
               soundEffectsInstance.playSubmitTone();
-              onProctorWarning('⚠️ GAZE_DEVIATION: Candidate attention appears to be directed away from the screen.');
+              setTimeout(() => {
+                onProctorWarning('⚠️ GAZE_DEVIATION: Candidate attention appears to be directed away from the screen.');
+              }, 0);
             }
           }
         } else {
@@ -223,7 +230,9 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
               lastDeviceAlertTime = now;
               soundEffectsInstance.playSubmitTone();
               const label = result.detectedDeviceLabel || 'electronic device';
-              onProctorWarning(`📱 ELECTRONIC_DEVICE: A mobile ${label} was detected.`);
+              setTimeout(() => {
+                onProctorWarning(`📱 ELECTRONIC_DEVICE: A mobile ${label} was detected.`);
+              }, 0);
             }
           }
         } else {
