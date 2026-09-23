@@ -46,15 +46,16 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
 
       let stream;
       try {
+        // Request BOTH video & audio so browser prompts for Camera and Microphone together!
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 }
           },
-          audio: false
+          audio: true
         });
-      } catch (constraintErr) {
-        console.warn('Ideal constraints failed, retrying with basic video: true...', constraintErr);
+      } catch (combinedErr) {
+        console.warn('Combined camera+mic failed, falling back to video only...', combinedErr);
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false
@@ -73,15 +74,15 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       }
     } catch (err) {
       console.warn('Camera access error details:', err.name, err.message);
-      let msg = 'Camera access blocked or unavailable.';
+      let msg = 'Camera / Microphone access blocked or unavailable.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Camera permission blocked by browser.';
+        msg = 'Camera & Microphone permission blocked by browser.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'No webcam hardware detected on this device.';
+        msg = 'No webcam or microphone hardware detected on this device.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        msg = 'Camera is currently in use by another app (Zoom/Teams/Discord).';
+        msg = 'Camera or Microphone is currently in use by another app (Zoom/Teams/Discord).';
       } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        msg = 'Webcam hardware does not support requested resolution.';
+        msg = 'Hardware does not support requested resolution.';
       }
       setCameraError(msg);
       setCameraActive(false);
@@ -213,7 +214,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         // 3. ELECTRONIC DEVICE & EARPHONE DETECTION (COCO-SSD model)
         if (result.hasPhone || result.hasOtherDevice || result.hasEarphones) {
           consecutiveDeviceCount++;
-          if (consecutiveDeviceCount >= 2) {
+          if (consecutiveDeviceCount >= 1) {
             const warningType = result.hasEarphones ? 'earphones' : 'phone';
             setDeviceWarning(warningType);
             if (now - lastDeviceAlertTime > ALERT_COOLDOWN_MS) {

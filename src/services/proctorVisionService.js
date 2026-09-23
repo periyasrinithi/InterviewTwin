@@ -50,10 +50,10 @@ export async function analyzeVideoFrame(videoElement) {
   }
 
   try {
-    // Run BlazeFace and COCO-SSD predictions concurrently
+    // Run BlazeFace and COCO-SSD predictions concurrently (detect with low score threshold 0.25)
     const [facePredictions, objectPredictions] = await Promise.all([
       blazeModel.estimateFaces(videoElement, false),
-      cocoModel.detect(videoElement, 6, 0.40)
+      cocoModel.detect(videoElement, 10, 0.25)
     ]);
 
     // 1. Face Count Analysis
@@ -76,7 +76,7 @@ export async function analyzeVideoFrame(videoElement) {
         const noseOffsetX = Math.abs(nose[0] - eyeCenterX) / eyeWidth;
 
         // If nose is significantly offset from center line between eyes, head/gaze is turned away
-        if (noseOffsetX > 0.45) {
+        if (noseOffsetX > 0.40) {
           gazeScore = 40;
           isLookingAway = true;
         } else {
@@ -90,19 +90,28 @@ export async function analyzeVideoFrame(videoElement) {
       isLookingAway = true;
     }
 
-    // 3. Electronic Device Detection (Cell Phone, Laptop, Tablet, TV, Keyboard, Remote)
+    // 3. Electronic Device Detection (Cell Phone, Mobile Phone, Laptop, Tablet, TV, Keyboard, Remote, Mouse)
     const electronicDevices = objectPredictions.filter(p => {
       const cls = p.class.toLowerCase();
-      return (cls === 'cell phone' || cls === 'laptop' || cls === 'tv' || cls === 'remote' || cls === 'keyboard') && p.score >= 0.45;
+      return (
+        cls.includes('phone') ||
+        cls.includes('cell') ||
+        cls === 'laptop' ||
+        cls === 'tablet' ||
+        cls === 'tv' ||
+        cls === 'remote' ||
+        cls === 'keyboard' ||
+        cls === 'mouse'
+      ) && p.score >= 0.25;
     });
 
-    const detectedPhone = electronicDevices.find(p => p.class.toLowerCase() === 'cell phone');
-    const detectedOtherDevice = electronicDevices.find(p => p.class.toLowerCase() !== 'cell phone');
+    const detectedPhone = electronicDevices.find(p => p.class.toLowerCase().includes('phone') || p.class.toLowerCase().includes('cell'));
+    const detectedOtherDevice = electronicDevices.find(p => !p.class.toLowerCase().includes('phone') && !p.class.toLowerCase().includes('cell'));
 
-    // 4. Earphone / Headphone Detection (COCO-SSD headphones or ear region anomaly)
+    // 4. Earphone / Headphone Detection
     const detectedHeadphones = objectPredictions.find(p => {
       const cls = p.class.toLowerCase();
-      return (cls === 'headphone' || cls === 'headphones' || cls === 'earphone') && p.score >= 0.40;
+      return (cls.includes('headphone') || cls.includes('earphone')) && p.score >= 0.25;
     });
 
     return {
