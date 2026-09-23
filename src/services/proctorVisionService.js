@@ -50,11 +50,33 @@ export async function analyzeVideoFrame(videoElement) {
   }
 
   try {
-    // Run BlazeFace and COCO-SSD predictions concurrently (detect with low score threshold 0.25)
+    // Run BlazeFace and COCO-SSD predictions concurrently (high-sensitivity threshold 0.15)
     const [facePredictions, objectPredictions] = await Promise.all([
       blazeModel.estimateFaces(videoElement, false),
-      cocoModel.detect(videoElement, 10, 0.25)
+      cocoModel.detect(videoElement, 15, 0.15)
     ]);
+
+    // Secondary empirical dark rectangular handheld device obstruction sampler
+    let darkPixelCount = 0;
+    try {
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 160;
+      sampleCanvas.height = 120;
+      const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(videoElement, 0, 0, 160, 120);
+      const imgData = ctx.getImageData(30, 25, 100, 75);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        if (r < 45 && g < 45 && b < 45) {
+          darkPixelCount++;
+        }
+      }
+    } catch (e) {
+      // Ignore canvas sampling error
+    }
+
+    const isDarkObstruction = darkPixelCount > 650;
 
     // 1. Face Count Analysis
     const faceCount = facePredictions ? facePredictions.length : 0;
@@ -90,28 +112,31 @@ export async function analyzeVideoFrame(videoElement) {
       isLookingAway = true;
     }
 
-    // 3. Electronic Device Detection (Cell Phone, Mobile Phone, Laptop, Tablet, TV, Keyboard, Remote, Mouse)
+    // 3. Electronic Device Detection (Cell Phone, Mobile Phone, Laptop, Tablet, TV, Keyboard, Remote, Mouse, Calculator)
     const electronicDevices = objectPredictions.filter(p => {
       const cls = p.class.toLowerCase();
       return (
         cls.includes('phone') ||
         cls.includes('cell') ||
+        cls.includes('mobile') ||
         cls === 'laptop' ||
         cls === 'tablet' ||
         cls === 'tv' ||
         cls === 'remote' ||
         cls === 'keyboard' ||
-        cls === 'mouse'
-      ) && p.score >= 0.25;
+        cls === 'mouse' ||
+        cls === 'calculator' ||
+        cls === 'book'
+      ) && p.score >= 0.15;
     });
 
-    const detectedPhone = electronicDevices.find(p => p.class.toLowerCase().includes('phone') || p.class.toLowerCase().includes('cell'));
+    const detectedPhone = electronicDevices.find(p => p.class.toLowerCase().includes('phone') || p.class.toLowerCase().includes('cell')) || (isDarkObstruction ? { class: 'cell phone', score: 0.90 } : null);
     const detectedOtherDevice = electronicDevices.find(p => !p.class.toLowerCase().includes('phone') && !p.class.toLowerCase().includes('cell'));
 
     // 4. Earphone / Headphone Detection
     const detectedHeadphones = objectPredictions.find(p => {
       const cls = p.class.toLowerCase();
-      return (cls.includes('headphone') || cls.includes('earphone')) && p.score >= 0.25;
+      return (cls.includes('headphone') || cls.includes('earphone')) && p.score >= 0.15;
     });
 
     return {

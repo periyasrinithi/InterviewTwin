@@ -344,11 +344,11 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
               lineHeight: 1.45,
               textAlign: 'left'
             }}>
-              <strong>How to Allow Camera Permission:</strong>
+              <strong>How to Allow Camera & Microphone Permissions:</strong>
               <ol style={{ margin: '0.3rem 0 0 1.2rem', padding: 0 }}>
-                <li>Click the <strong>🔒 Lock icon</strong> or <strong>Tune icon</strong> in your browser URL bar (left of <code>localhost:8080</code>).</li>
-                <li>Set <strong>Camera</strong> to <strong>Allow</strong>.</li>
-                <li>Click <strong>[Retry Webcam]</strong> below.</li>
+                <li>Click the <strong>🔒 Lock icon</strong> or <strong>Tune icon</strong> in your browser address bar (left of <code>localhost:8080</code>).</li>
+                <li>Set both <strong>Camera</strong> and <strong>Microphone</strong> to <strong>Allow</strong>.</li>
+                <li>Click <strong>[Grant Camera & Mic Access]</strong> below.</li>
               </ol>
             </div>
 
@@ -359,7 +359,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
               >
                 <RefreshCw size={13} />
-                <span>Retry Webcam</span>
+                <span>Grant Camera & Mic Access</span>
               </button>
 
               <button
