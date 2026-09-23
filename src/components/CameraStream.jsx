@@ -44,27 +44,22 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         return;
       }
 
-      // Query available video inputs
+      let stream;
       try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputDevices = devices.filter(d => d.kind === 'videoinput');
-        if (videoInputDevices.length === 0) {
-          setCameraError('No webcam hardware detected on this PC.');
-          setCameraActive(false);
-          return;
-        }
-      } catch (enumErr) {
-        console.warn('Enumerate devices warning:', enumErr);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+      } catch (constraintErr) {
+        console.warn('Ideal constraints failed, retrying with basic video: true...', constraintErr);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: false
-      });
 
       streamRef.current = stream;
       setCameraActive(true);
@@ -85,6 +80,8 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         msg = 'No webcam hardware detected on this device.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         msg = 'Camera is currently in use by another app (Zoom/Teams/Discord).';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        msg = 'Webcam hardware does not support requested resolution.';
       }
       setCameraError(msg);
       setCameraActive(false);
@@ -116,14 +113,14 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         lastTabOrBlurTime = Date.now();
-        setTabSwitchCount(prev => prev + 1);
-        soundEffectsInstance.playSubmitTone();
+        setTabSwitchCount(prev => {
+          const next = prev + 1;
+          soundEffectsInstance.playSubmitTone();
+          onProctorWarning(`🚨 TAB_SWITCH: Interview tab was left. (Switch #${next})`);
+          return next;
+        });
         setTabSwitchWarning(true);
         setTimeout(() => setTabSwitchWarning(false), 4500);
-
-        setTimeout(() => {
-          onProctorWarning(`🚨 TAB_SWITCH: Interview tab was left.`);
-        }, 0);
       }
     };
 
@@ -134,12 +131,9 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       if (!document.hidden) {
         lastTabOrBlurTime = now;
         soundEffectsInstance.playSubmitTone();
+        onProctorWarning(`⚠️ WINDOW_BLUR: Interview window lost focus.`);
         setTabSwitchWarning(true);
         setTimeout(() => setTabSwitchWarning(false), 4500);
-
-        setTimeout(() => {
-          onProctorWarning(`⚠️ WINDOW_BLUR: Interview window lost focus.`);
-        }, 0);
       }
     };
 
@@ -191,9 +185,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             if (now - lastFaceAlertTime > ALERT_COOLDOWN_MS) {
               lastFaceAlertTime = now;
               soundEffectsInstance.playSubmitTone();
-              setTimeout(() => {
-                onProctorWarning('🚨 MULTIPLE_FACES: Multiple people detected in the camera frame.');
-              }, 0);
+              onProctorWarning('🚨 MULTIPLE_FACES: Multiple people detected in the camera frame.');
             }
           }
         } else {
@@ -210,9 +202,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
             if (now - lastGazeAlertTime > ALERT_COOLDOWN_MS) {
               lastGazeAlertTime = now;
               soundEffectsInstance.playSubmitTone();
-              setTimeout(() => {
-                onProctorWarning('⚠️ GAZE_DEVIATION: Candidate attention appears to be directed away from the screen.');
-              }, 0);
+              onProctorWarning('⚠️ GAZE_DEVIATION: Candidate attention appears to be directed away from the screen.');
             }
           }
         } else {
@@ -230,9 +220,7 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
               lastDeviceAlertTime = now;
               soundEffectsInstance.playSubmitTone();
               const label = result.detectedDeviceLabel || 'electronic device';
-              setTimeout(() => {
-                onProctorWarning(`📱 ELECTRONIC_DEVICE: A mobile ${label} was detected.`);
-              }, 0);
+              onProctorWarning(`📱 ELECTRONIC_DEVICE: A mobile ${label} was detected.`);
             }
           }
         } else {
