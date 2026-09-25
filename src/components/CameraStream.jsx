@@ -33,30 +33,41 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     }
   };
 
+  const getMediaStream = async (constraints) => {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    }
+    const legacyFn = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    if (legacyFn) {
+      return new Promise((resolve, reject) => {
+        legacyFn.call(navigator, constraints, resolve, reject);
+      });
+    }
+    throw new Error('MEDIA_API_UNSUPPORTED');
+  };
+
   const startCamera = async () => {
     try {
       setCameraError(null);
       stopCurrentStream();
 
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Browser media API not supported.');
-        setCameraActive(false);
-        return;
-      }
-
       let stream;
       try {
-        // Request BOTH video & audio so browser prompts for Camera and Microphone together!
-        stream = await navigator.mediaDevices.getUserMedia({
+        stream = await getMediaStream({
           video: {
             width: { ideal: 640 },
             height: { ideal: 480 }
           },
-          audio: true
+          audio: false
         });
-      } catch (combinedErr) {
-        console.warn('Combined camera+mic failed, falling back to video only...', combinedErr);
-        stream = await navigator.mediaDevices.getUserMedia({
+      } catch (firstErr) {
+        if (firstErr.message === 'MEDIA_API_UNSUPPORTED') {
+          setCameraError('Browser media API not supported in this browser.');
+          setCameraActive(false);
+          return;
+        }
+        console.warn('Ideal video constraints failed, retrying basic video: true...', firstErr);
+        stream = await getMediaStream({
           video: true,
           audio: false
         });
@@ -74,15 +85,17 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
       }
     } catch (err) {
       console.warn('Camera access error details:', err.name, err.message);
-      let msg = 'Camera / Microphone access blocked or unavailable.';
+      let msg = 'Camera access blocked or unavailable.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Camera & Microphone permission blocked by browser.';
+        msg = 'Camera permission blocked by browser settings.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'No webcam or microphone hardware detected on this device.';
+        msg = 'No webcam hardware detected on this device.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        msg = 'Camera or Microphone is currently in use by another app (Zoom/Teams/Discord).';
+        msg = 'Camera is currently in use by another app (Zoom/Teams/Discord).';
       } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
         msg = 'Hardware does not support requested resolution.';
+      } else if (err.message === 'MEDIA_API_UNSUPPORTED') {
+        msg = 'Browser media API not supported in this browser.';
       }
       setCameraError(msg);
       setCameraActive(false);

@@ -196,6 +196,16 @@ export default function LiveSession({ sessionConfig, questions = [], onFinishSes
     speechSynthesisInstance.cancel();
     stopListening();
     setCurrentFollowUp(null);
+    setTranscript('');
+    setInterimText('');
+    setManualText('');
+    setSpeechMetrics({
+      wpm: 0,
+      totalWords: 0,
+      totalFillers: 0,
+      fillerWordCounts: {},
+      durationSeconds: 0
+    });
 
     if (currentIdx + 1 < questions.length) {
       setCurrentIdx(prev => prev + 1);
