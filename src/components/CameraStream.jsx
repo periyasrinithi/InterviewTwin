@@ -33,41 +33,44 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
     }
   };
 
-  const getMediaStream = async (constraints) => {
-    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-      return await navigator.mediaDevices.getUserMedia(constraints);
+  const startCamera = async () => {
+    setCameraError(null);
+    stopCurrentStream();
+
+    const hasMediaSupport = !!(
+      (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') ||
+      navigator.getUserMedia ||
+      navigator.webkitGetUserMedia ||
+      navigator.mozGetUserMedia ||
+      navigator.msGetUserMedia
+    );
+
+    if (!hasMediaSupport) {
+      setCameraError('Browser media API not supported in this browser.');
+      setCameraActive(false);
+      return;
     }
-    const legacyFn = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-    if (legacyFn) {
+
+    const requestWebcamStream = async (constraints) => {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      }
+      const legacyFn = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
       return new Promise((resolve, reject) => {
         legacyFn.call(navigator, constraints, resolve, reject);
       });
-    }
-    throw new Error('MEDIA_API_UNSUPPORTED');
-  };
+    };
 
-  const startCamera = async () => {
     try {
-      setCameraError(null);
-      stopCurrentStream();
-
       let stream;
       try {
-        stream = await getMediaStream({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          },
+        stream = await requestWebcamStream({
+          video: { width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false
         });
-      } catch (firstErr) {
-        if (firstErr.message === 'MEDIA_API_UNSUPPORTED') {
-          setCameraError('Browser media API not supported in this browser.');
-          setCameraActive(false);
-          return;
-        }
-        console.warn('Ideal video constraints failed, retrying basic video: true...', firstErr);
-        stream = await getMediaStream({
+      } catch (idealErr) {
+        console.warn('Ideal camera resolution failed, attempting fallback constraints:', idealErr);
+        stream = await requestWebcamStream({
           video: true,
           audio: false
         });
@@ -84,19 +87,22 @@ export default function CameraStream({ isLive = false, onProctorWarning = () => 
         });
       }
     } catch (err) {
-      console.warn('Camera access error details:', err.name, err.message);
+      console.warn('Camera access error details:', err?.name, err?.message, err);
+      
+      const errName = err?.name || '';
+      const errMsg = (err?.message || '').toLowerCase();
+
       let msg = 'Camera access blocked or unavailable.';
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError' || errMsg.includes('permission') || errMsg.includes('denied')) {
         msg = 'Camera permission blocked by browser settings.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError' || errMsg.includes('not found')) {
         msg = 'No webcam hardware detected on this device.';
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      } else if (errName === 'NotReadableError' || errName === 'TrackStartError' || errMsg.includes('in use')) {
         msg = 'Camera is currently in use by another app (Zoom/Teams/Discord).';
-      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+      } else if (errName === 'OverconstrainedError' || errName === 'ConstraintNotSatisfiedError') {
         msg = 'Hardware does not support requested resolution.';
-      } else if (err.message === 'MEDIA_API_UNSUPPORTED') {
-        msg = 'Browser media API not supported in this browser.';
       }
+
       setCameraError(msg);
       setCameraActive(false);
     }

@@ -50,13 +50,18 @@ export default function LiveSession({ sessionConfig, questions = [], onFinishSes
 
     const textToSpeak = currentFollowUp ? currentFollowUp : currentQuestion.question;
     setOrbState('speaking');
+    setSessionState('question_intro');
 
     speechSynthesisInstance.speak(textToSpeak, {
       pitch: sessionConfig?.persona?.voicePitch || 1.0,
       rate: sessionConfig?.persona?.voiceRate || 1.0,
-      onStart: () => setOrbState('speaking'),
+      onStart: () => {
+        setOrbState('speaking');
+        setSessionState('question_intro');
+      },
       onEnd: () => {
         setOrbState('idle');
+        setSessionState('listening');
         startListening();
       }
     });

@@ -52,14 +52,17 @@ export class SpeechSynthesisService {
       } = options;
 
       this.cancel(); // Stop any active speech
+      this.isCancelled = false;
 
       if (!this.synth) {
         // Fallback simulation if TTS not supported
         onStart();
         const duration = Math.min(Math.max(text.length * 50, 1500), 8000);
-        setTimeout(() => {
-          onEnd();
-          resolve();
+        this.fallbackTimer = setTimeout(() => {
+          if (!this.isCancelled) {
+            onEnd();
+            resolve();
+          }
         }, duration);
         return;
       }
@@ -73,14 +76,18 @@ export class SpeechSynthesisService {
       utterance.volume = volume;
 
       utterance.onstart = () => {
-        this.isSpeaking = true;
-        onStart();
+        if (!this.isCancelled) {
+          this.isSpeaking = true;
+          onStart();
+        }
       };
 
       utterance.onend = () => {
         this.isSpeaking = false;
         this.currentUtterance = null;
-        onEnd();
+        if (!this.isCancelled) {
+          onEnd();
+        }
         resolve();
       };
 
@@ -88,12 +95,14 @@ export class SpeechSynthesisService {
         console.warn('TTS error:', e);
         this.isSpeaking = false;
         this.currentUtterance = null;
-        onEnd();
+        if (!this.isCancelled) {
+          onEnd();
+        }
         resolve();
       };
 
       utterance.onboundary = (e) => {
-        onBoundary(e);
+        if (!this.isCancelled) onBoundary(e);
       };
 
       this.currentUtterance = utterance;
@@ -102,6 +111,11 @@ export class SpeechSynthesisService {
   }
 
   cancel() {
+    this.isCancelled = true;
+    if (this.fallbackTimer) {
+      clearTimeout(this.fallbackTimer);
+      this.fallbackTimer = null;
+    }
     if (this.synth && this.isSpeaking) {
       this.synth.cancel();
       this.isSpeaking = false;
